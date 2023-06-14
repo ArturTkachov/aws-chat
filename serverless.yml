@@ -1,0 +1,131 @@
+service: websocket-api
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  websocketsApiRouteSelectionExpression: $request.body.action # custom routes are selected by the value of the action property in the body
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    lambdaPort: 3002
+
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      migrate: true
+      seed: true
+      convertEmptyValues: true
+      noStart: true
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+  - serverless-offline-lambda
+
+package:
+  patterns:
+    - '!.idea'
+    - '!.gitignore'
+
+functions:
+  websocketHandler:
+    name: websocket-handler-${sls:stage}
+    memorySize: 128
+    handler: handler.handler
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+      - websocket:
+          route: $default
+    role: WebsocketLambdaRole
+
+resources:
+  Resources:
+    WebsocketLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /lambda/ws/
+        RoleName: WebsocketLambdaRole # required if you want to use 'serverless deploy --function' later on
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        # note that these rights are needed if you want your function to be able to communicate with resources within your vpc
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+          - !Ref LogsPolicy
+          - !Ref DynamoDbRWPolicy
+
+    LogsPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            -
+              Sid: AllowAllUsersWritingLogs
+              Effect: Allow # note that these rights are given in the default policy and are required if you want logs out of your lambda(s)
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - logs:TagResource
+              Resource:
+                - '*'
+
+    DynamoDbRWPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow # note that these rights are given in the default policy and are required if you want logs out of your lambda(s)
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+#                - dynamodb:Scan
+              Resource:
+                - '*'
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UsersTable
+        AttributeDefinitions:
+          - AttributeName: ClientId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ClientId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+
+
+
+
+#resources:
+#  Resources:
+#    WebsocketApi:
+#      Type: AWS::ApiGatewayV2::Api
+#      Properties:
+#        Name: my-websocket-api
+#
+#    WebsocketIntegration:
+#      Properties:
+#        Body: Json
+#      Type: AWS::ApiGatewayV2::Integration
+

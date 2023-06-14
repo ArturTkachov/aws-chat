@@ -1,0 +1,18 @@
+{
+  "name": "ws-lambda",
+  "version": "1.0.0",
+  "description": "",
+  "main": "handler.js",
+  "scripts": {
+    "migrate": "serverless dynamodb migrate",
+    "start": "serverless offline",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "serverless-offline": "^12.0.4",
+    "serverless-offline-lambda": "^1.0.6",
+    "serverless-dynamodb-local": "^0.2.40"
+  }
+}
